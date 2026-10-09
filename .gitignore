@@ -1,0 +1,10 @@
+**/__pycache__/
+**/.venv/
+**/node_modules/
+**/dist/
+admin_backend/data/
+.env
+**/.test-data/
+**/test-results/
+**/playwright-report/
+**/*.egg-info/
