@@ -18,6 +18,33 @@ docker compose logs -f --tail=100 falcon
 
 默认端口只绑定宿主机本地地址。目前应用没有登录认证；服务器部署建议使用带认证和 HTTPS 的反向代理。确需让其他机器直接访问时，在 `.env` 中设置 `FALCON_BIND_HOST=0.0.0.0`，并限制访问来源。
 
+## 国内网络构建
+
+默认已使用国内依赖源，无需额外参数：
+
+| 下载内容 | 默认来源 |
+| --- | --- |
+| npm 包 | `https://registry.npmmirror.com` |
+| Python 包 | `https://pypi.tuna.tsinghua.edu.cn/simple` |
+| Debian 软件包 | 清华 Debian / Debian Security 镜像 |
+
+npm 锁文件中的 npmjs 下载地址仅在镜像构建时替换，不改变仓库锁文件和包完整性校验。pip / npm 增加了下载超时及重试。所有软件源均可通过根目录 `.env` 覆盖，变量示例见 `.env.compose.example`。
+
+**基础镜像仍需要 Docker 能访问镜像仓库。** 如果报错发生在 `load metadata for docker.io/library/node`、`python` 或出现 Docker Hub 超时，依赖源不会解决该阶段的问题。可以使用以下任一方式：
+
+1. 在 Docker Desktop 的 Settings → Docker Engine 中，合并添加你的可用 `registry-mirrors` 地址，然后 Apply & Restart；Linux Docker 在 `/etc/docker/daemon.json` 配置同一字段后重启 Docker。不要覆盖已有配置。加速地址以云服务商或你实际可用的服务为准。
+2. 将 `.env.compose.example` 复制为 `.env`，把 `NODE_IMAGE` 和 `PYTHON_IMAGE` 改成你可访问仓库的完整镜像名。这两个镜像需分别对应 `node:22-bookworm-slim` 和 `python:3.11-slim-bookworm`；不要替换为 Alpine 版本。
+3. 若使用本机代理，配置 Docker Desktop 自身的代理设置。管理后台里的任务代理仅作用于采集，不作用于 Docker 拉镜像或构建下载。
+
+修改源或镜像名后重新构建：
+
+```sh
+docker compose build --pull falcon
+docker compose up -d
+```
+
+国内软件源只优化安装下载，不改变 RedNote / Dify 等业务请求地址。国内网络访问海外站点时，仍可在后台按需配置代理。
+
 ## 数据持久化与迁移
 
 容器数据绑定到宿主机 `admin_backend/data/`，与当前本机开发模式使用相同的数据目录。已有账号、任务、代理、接码 Key、运行记录可以直接沿用；不要同时运行本机后端与容器后端，否则两个调度器会重复执行任务。
