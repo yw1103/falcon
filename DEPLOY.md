@@ -45,6 +45,8 @@ docker compose up -d
 
 国内软件源只优化安装下载，不改变 RedNote / Dify 等业务请求地址。国内网络访问海外站点时，仍可在后台按需配置代理。
 
+管理容器只安装 Spider_XHS PC 搜索和详情 API 所需的 Python 依赖，不安装上游完整 `requirements.txt` 中用于其他爬虫功能的 OpenCV、NumPy、OpenPyXL 等大包。系统层只安装 CA 证书和 Node 运行所需的小型库；这能避免 Debian 为 OpenCV 引入 LLVM、ICU 等大体积依赖。
+
 ## 数据持久化与迁移
 
 容器数据绑定到宿主机 `admin_backend/data/`，与当前本机开发模式使用相同的数据目录。已有账号、任务、代理、接码 Key、运行记录可以直接沿用；不要同时运行本机后端与容器后端，否则两个调度器会重复执行任务。

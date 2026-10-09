@@ -27,15 +27,16 @@ ENV PYTHONUNBUFFERED=1 \
     SPIDER_XHS_PATH=/app/Spider_XHS \
     XHS_ADMIN_DATA=/app/admin_backend/data
 
-# OpenCV is an upstream dependency; its wheel needs these shared libraries.
+# Keep the runtime system packages small. The admin adapter only uses the
+# upstream PC search/detail APIs, not the full crawler's OpenCV toolchain.
 RUN python -c 'from pathlib import Path; import sys; p=Path("/etc/apt/sources.list.d/debian.sources"); s=p.read_text(); s=s.replace("http://deb.debian.org/debian-security", sys.argv[2].rstrip("/")).replace("http://deb.debian.org/debian", sys.argv[1].rstrip("/")); p.write_text(s)' "$DEBIAN_MIRROR" "$DEBIAN_SECURITY_MIRROR" \
     && apt-get -o Acquire::Retries=3 update \
-    && apt-get install -y --no-install-recommends ca-certificates libgl1 libglib2.0-0 libstdc++6 \
+    && apt-get install -y --no-install-recommends ca-certificates libstdc++6 libatomic1 \
     && rm -rf /var/lib/apt/lists/*
 COPY --from=spider-node /usr/local/bin/node /usr/local/bin/node
 
 WORKDIR /app/admin_backend
-COPY Spider_XHS/requirements.txt /tmp/spider-requirements.txt
+COPY admin_backend/requirements-spider-runtime.txt /tmp/spider-requirements.txt
 RUN PIP_INDEX_URL="$PIP_INDEX_URL" pip install --no-cache-dir --timeout=120 --retries=3 -r /tmp/spider-requirements.txt
 COPY admin_backend/ ./
 RUN PIP_INDEX_URL="$PIP_INDEX_URL" pip install --no-cache-dir --timeout=120 --retries=3 .

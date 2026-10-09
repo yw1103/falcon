@@ -1,0 +1,5 @@
+# Only the Spider_XHS PC search/detail runtime used by the management adapter.
+# Avoid the full upstream requirements: OpenCV/NumPy are for unrelated crawler features.
+curl_cffi==0.15.0
+loguru
+requests
