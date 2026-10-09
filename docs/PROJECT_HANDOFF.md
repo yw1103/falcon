@@ -107,6 +107,6 @@ run 保存 task_id、task_name、sample、status、count、search 参数快照�
 - 暂停仅阻止下一轮，不中断当前网络请求；账号和任务锁仅在进程内。
 - 后端测试最近为 16 项通过，代理修复后前端构建通过。真实接码用户已确认可用，宿主机代理实际检测成功。其他外部调用需要真实凭据验证，单元测试多使用替身。
 - Docker 配置已解析检查，但当前开发机器无 docker 命令，镜像构建及容器运行尚未实测。
-- Docker 构建默认使用 npmmirror 和清华 Python/Debian 镜像源；Compose 支持用 build args 覆盖源及 Node/Python 基础镜像。Docker Hub 拉取加速或代理需要部署机器自行配置，详见 DEPLOY.md。
+- Docker 构建默认使用 npmmirror、清华 Python 和阿里云 Debian 镜像源；Compose 支持用 build args 覆盖源及 Node/Python 基础镜像。Docker Hub 拉取加速或代理需要部署机器自行配置，详见 DEPLOY.md。
 
 新 AI 开始工作时：先读 AGENTS.md 和此文档，确认工作区状态与服务进程，再针对需求定位代码、实现和验证；不需要重建整个项目，也不要假定聊天里的临时进程 ID 仍有效。

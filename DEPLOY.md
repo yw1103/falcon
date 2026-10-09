@@ -26,7 +26,7 @@ docker compose logs -f --tail=100 falcon
 | --- | --- |
 | npm 包 | `https://registry.npmmirror.com` |
 | Python 包 | `https://pypi.tuna.tsinghua.edu.cn/simple` |
-| Debian 软件包 | 清华 Debian / Debian Security 镜像 |
+| Debian 软件包 | 阿里云 Debian / Debian Security 镜像 |
 
 npm 锁文件中的 npmjs 下载地址仅在镜像构建时替换，不改变仓库锁文件和包完整性校验。pip / npm 增加了下载超时及重试。所有软件源均可通过根目录 `.env` 覆盖，变量示例见 `.env.compose.example`。
 
