@@ -47,6 +47,8 @@ docker compose up -d
 
 管理容器只安装 Spider_XHS PC 搜索和详情 API 所需的 Python 依赖，不安装上游完整 `requirements.txt` 中用于其他爬虫功能的 OpenCV、NumPy、OpenPyXL 等大包。系统层只安装 CA 证书和 Node 运行所需的小型库；这能避免 Debian 为 OpenCV 引入 LLVM、ICU 等大体积依赖。
 
+Docker 使用专用 Linux 依赖清单。当前镜像锁定 `curl_cffi==0.14.0`：`0.15.0` 在配置的 Python 镜像上没有兼容的 Linux wheel；`0.14.0` 有适配 Python 3.11 的 manylinux ABI3 wheel，且提供 Spider PC HTTP 客户端所用的 Session 参数。Windows 开发环境和 Spider_XHS 完整 requirements 不受此选择影响。
+
 ## 数据持久化与迁移
 
 容器数据绑定到宿主机 `admin_backend/data/`，与当前本机开发模式使用相同的数据目录。已有账号、任务、代理、接码 Key、运行记录可以直接沿用；不要同时运行本机后端与容器后端，否则两个调度器会重复执行任务。

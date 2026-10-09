@@ -1,5 +1,7 @@
 # Only the Spider_XHS PC search/detail runtime used by the management adapter.
 # Avoid the full upstream requirements: OpenCV/NumPy are for unrelated crawler features.
-curl_cffi==0.15.0
+# 0.15.0 has no compatible Linux wheel on the current Python mirror; 0.14.0
+# provides a manylinux abi3 wheel and retains the Session options used here.
+curl_cffi==0.14.0
 loguru
 requests
