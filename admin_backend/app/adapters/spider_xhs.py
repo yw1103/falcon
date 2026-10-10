@@ -6,6 +6,8 @@ import time
 from pathlib import Path
 from urllib.parse import urlencode
 
+from ..timing import randomized_interval
+
 
 def load_upstream():
     root = Path(
@@ -20,11 +22,22 @@ def load_upstream():
 
 
 class SpiderXHSAdapter:
-    def __init__(self, *, cookie, site="rednote", proxy=None, request_interval=1):
+    def __init__(
+        self, *, cookie, site="rednote", proxy=None, request_interval=1,
+        randomize_request_interval=True, request_interval_jitter=3,
+    ):
         self.cookie = cookie
         self.site = site
         self.proxy = proxy or {}
         self.request_interval = request_interval
+        self.randomize_request_interval = randomize_request_interval
+        self.request_interval_jitter = request_interval_jitter
+
+    def _wait_request(self):
+        time.sleep(randomized_interval(
+            self.request_interval, self.randomize_request_interval,
+            self.request_interval_jitter,
+        ))
 
     def _auth(self):
         if not self.cookie.strip():
@@ -79,7 +92,7 @@ class SpiderXHSAdapter:
             root_id = generate_search_id()
             while len(notes) < max_items:
                 if page > 1:
-                    time.sleep(self.request_interval)
+                    self._wait_request()
                 for attempt in range(2):
                     ok, message, result = api.search_note(
                         keyword,
@@ -90,7 +103,7 @@ class SpiderXHSAdapter:
                     )
                     if ok or "curl: (28)" not in str(message) or attempt:
                         break
-                    time.sleep(min(max(self.request_interval, 1), 3))
+                    self._wait_request()
                 if not ok:
                     raise RuntimeError(f"Spider_XHS 搜索接口返回失败：{message}")
                 if not isinstance(result, dict) or not isinstance(
@@ -124,7 +137,7 @@ class SpiderXHSAdapter:
                 note["content_status"] = "failed"
                 note["content_error"] = "搜索结果缺少笔记 ID 或详情访问凭据"
                 continue
-            time.sleep(self.request_interval)
+            self._wait_request()
             url = auth.origin("web") + "/explore/" + str(note_id) + "?" + urlencode(
                 {"xsec_token": token, "xsec_source": "pc_search"}
             )

@@ -81,6 +81,10 @@ class Task(Named):
     keyword: str = Field(min_length=1, max_length=200)
     interval_seconds: int = Field(default=300, ge=10)
     request_interval_seconds: int = Field(default=5, ge=1)
+    randomize_task_interval: bool = True
+    task_interval_jitter_seconds: int = Field(default=60, ge=1, le=86400)
+    randomize_request_interval: bool = True
+    request_interval_jitter_seconds: int = Field(default=3, ge=1, le=3600)
     max_items: int = Field(default=20, ge=1, le=1000)
     fetch_content: bool = False
     account_id: str

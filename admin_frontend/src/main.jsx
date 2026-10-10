@@ -119,6 +119,10 @@ const defaults = {
     keyword: "",
     interval_seconds: 300,
     request_interval_seconds: 5,
+    randomize_task_interval: true,
+    task_interval_jitter_seconds: 60,
+    randomize_request_interval: true,
+    request_interval_jitter_seconds: 3,
     max_items: 20,
     fetch_content: false,
     sort_type_choice: 0,
@@ -1234,6 +1238,20 @@ function App() {
                         }
                       />
                     </Field>
+                    {[
+                      { label: "任务间隔随机浮动", enabled: "randomize_task_interval", jitter: "task_interval_jitter_seconds", base: "interval_seconds", max: 86400 },
+                      { label: "翻页间隔随机浮动", enabled: "randomize_request_interval", jitter: "request_interval_jitter_seconds", base: "request_interval_seconds", max: 3600 },
+                    ].map((setting) => (
+                      <div className="wide" key={setting.enabled}>
+                        <div className="switch-row">
+                          <div><strong>{setting.label}</strong><small>每次等待重新抽取，实际间隔不会低于设定值。</small></div>
+                          <Switch label={setting.label} checked={!!form[setting.enabled]} onCheckedChange={(value) => update(setting.enabled, value)} />
+                        </div>
+                        {form[setting.enabled] && <Field label={`${setting.label}上限（秒）`} hint={`实际等待 ${form[setting.base]}–${Number(form[setting.base]) + Number(form[setting.jitter])} 秒。翻页设置也用于正文和搜索重试请求。`}>
+                          <input type="number" min="1" max={setting.max} value={form[setting.jitter]} onChange={(e) => update(setting.jitter, Number(e.target.value))} />
+                        </Field>}
+                      </div>
+                    ))}
                     <Field label="Dify 投递预设">
                       {select(
                         "dify_preset_id",

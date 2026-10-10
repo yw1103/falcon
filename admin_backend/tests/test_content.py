@@ -32,7 +32,7 @@ def test_details_preserve_search_data_and_continue_after_failure(monkeypatch):
                 return False, "not found", None
             return True, "ok", raw_detail
 
-    adapter = SpiderXHSAdapter(cookie="", proxy={"https": "http://proxy.test:8080"}, request_interval=5)
+    adapter = SpiderXHSAdapter(cookie="", proxy={"https": "http://proxy.test:8080"}, request_interval=5, randomize_request_interval=False)
     adapter._fetch_contents(Api(), Auth(), notes)
     assert notes[0]["note_card"] == {"display_title": "title"}
     assert notes[0]["note_detail"] == raw_detail

@@ -65,7 +65,9 @@ Task schema 拒绝额外字段。前端编辑只从 defaults 中选出可编辑�
 
 试采集只搜索第一页，最多 `min(max_items,20)`，不投递 Dify；如果开启正文，试采集同样获取详情，耗时会增加。编辑表单当前要求先保存任务；表单试采集会先 PUT 当前配置。
 
-正式采集按 max_items 翻页；搜索失败会导致本轮 failed。搜索 curl 28 超时最多重试一次，重试等待 1–3 秒，不重试其他业务失败。上游搜索 timeout 为 45 秒。
+正式采集按 max_items 翻页；搜索失败会导致本轮 failed。搜索 curl 28 超时最多重试一次，重试使用任务请求间隔（含随机浮动），不重试其他业务失败。上游搜索 timeout 为 45 秒。
+
+任务和请求间隔默认开启独立随机浮动，旧任务缺少配置也按开启处理。每次任务结束后等待 interval_seconds + uniform(0, task_interval_jitter_seconds)，默认 300–360 秒；翻页、正文和搜索重试每次等待 request_interval_seconds + uniform(0, request_interval_jitter_seconds)，默认 5–8 秒。两个开关分别为 randomize_task_interval 和 randomize_request_interval，默认 true；额外秒数默认 60 / 3。关闭开关恢复基础间隔。首次调度仍立即执行，随机间隔不保证免于平台限制。
 
 正文获取复用相同 auth/proxy，取搜索 item 的 id/note_id 和 xsec_token 构造当前站点 URL，再调用 `get_note_info`。结果追加 `note_detail`（完整详情接口响应）、`content_status`，失败追加 `content_error`；保留原搜索 item。非 note item 跳过。正文单篇失败不会使整轮失败，目前详情 timeout 仍是上游全局 15 秒，没有详情重试。详情正文通常位于 `note_detail.data.items[*].note_card.desc`，以上游实际返回为准。
 

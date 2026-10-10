@@ -10,6 +10,7 @@ from fastapi import HTTPException
 
 from . import storage
 from .adapters.spider_xhs import SpiderXHSAdapter
+from .timing import randomized_interval
 
 locks = {}
 locks_guard = threading.Lock()
@@ -44,6 +45,8 @@ def adapter(account, config=None):
         site=account.get("site", "rednote"),
         proxy={"http": url, "https": url} if url else {},
         request_interval=(config or {}).get("request_interval_seconds", 1),
+        randomize_request_interval=(config or {}).get("randomize_request_interval", True),
+        request_interval_jitter=(config or {}).get("request_interval_jitter_seconds", 3),
     )
 
 
@@ -97,6 +100,12 @@ def execute_task(task_id, sample=False):
         "keyword": task["keyword"],
         "query_num": task["max_items"],
         "fetch_content": task.get("fetch_content", False),
+        "interval_seconds": task["interval_seconds"],
+        "request_interval_seconds": task["request_interval_seconds"],
+        "randomize_task_interval": task.get("randomize_task_interval", True),
+        "task_interval_jitter_seconds": task.get("task_interval_jitter_seconds", 60),
+        "randomize_request_interval": task.get("randomize_request_interval", True),
+        "request_interval_jitter_seconds": task.get("request_interval_jitter_seconds", 3),
         "sort_type_choice": task.get("sort_type_choice", 0),
         "note_type": task.get("note_type", 0),
         "note_time": task.get("note_time", 0),
@@ -199,4 +208,8 @@ def scheduler(stop):
                 safe_run(task["id"])
             except Exception:
                 pass
-            due[task["id"]] = time.monotonic() + task["interval_seconds"]
+            due[task["id"]] = time.monotonic() + randomized_interval(
+                task["interval_seconds"],
+                task.get("randomize_task_interval", True),
+                task.get("task_interval_jitter_seconds", 60),
+            )
