@@ -73,7 +73,7 @@ class SpiderXHSAdapter:
     def check(self):
         auth = self._auth()
         try:
-            return {"user_id": auth.user_id}
+            return {"user_id": auth.user_id, "profile": dict(auth.user_profile)}
         finally:
             auth.close()
 

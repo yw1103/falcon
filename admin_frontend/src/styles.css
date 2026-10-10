@@ -1159,3 +1159,7 @@ summary {
     font-size: 8px;
   }
 }
+/* Account profile returned by the authenticated current-user API. */
+.account-profile { display: flex; align-items: flex-start; gap: 10px; margin-top: 10px; }
+.account-avatar { width: 44px; height: 44px; border-radius: 50%; object-fit: cover; flex-shrink: 0; }
+.account-description { max-width: 280px; white-space: normal; overflow-wrap: anywhere; }

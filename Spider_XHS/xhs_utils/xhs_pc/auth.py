@@ -194,6 +194,7 @@ class XHSPcAuth(XHSAuth):
     http_client: Optional[PcHttpClient] = field(default=None, repr=False)
     _cookie_store: HostCookieStore = field(init=False, repr=False)
     _user_id_ready: bool = field(default=False, init=False, repr=False)
+    user_profile: dict = field(default_factory=dict, init=False, repr=False)
     _factory_token: InitVar[object] = None
 
     @property

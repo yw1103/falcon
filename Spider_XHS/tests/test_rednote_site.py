@@ -4,6 +4,29 @@ from xhs_utils.xhs_pc.dsl import DsFetcher
 from xhs_utils.xhs_pc.params import get_request_headers_template
 
 
+def test_bootstrap_retains_public_profile_without_an_extra_request():
+    from apis.xhs_pc_apis import XHS_Apis
+
+    auth = object.__new__(XHSPcAuth)
+    api = object.__new__(XHS_Apis)
+    api.auth = auth
+    calls = []
+
+    def get_user_me(proxies):
+        calls.append(proxies)
+        return True, "成功", {"data": {
+            "user_id": "user", "nickname": "nickname", "red_id": "123",
+            "gender": 0, "guest": False, "xsec_token": "private",
+        }}
+
+    api.get_user_me = get_user_me
+    api.bootstrap()
+    assert len(calls) == 1
+    assert auth.user_profile["nickname"] == "nickname"
+    assert auth.user_profile["gender"] == 0
+    assert "xsec_token" not in auth.user_profile
+
+
 def test_rednote_platform_uses_overseas_production_hosts():
     assert REDNOTE_PC_PLATFORM_CONFIG.cookie_domain == ".rednote.com"
     assert REDNOTE_PC_PLATFORM_CONFIG.origin("web") == "https://www.rednote.com"

@@ -397,6 +397,9 @@ function App() {
         item.name,
         item.keyword,
         item.phone,
+        item.profile?.nickname,
+        item.profile?.red_id,
+        item.user_id,
         item.base_url,
         item.model,
         item.task_name,
@@ -853,6 +856,19 @@ function App() {
                         <tr key={item.id}>
                           <td>
                             <strong>{item.name}</strong>
+                            {page === "accounts" && item.profile && (
+                              <div className="account-profile">
+                                {/^https?:\/\//.test(item.profile.images || item.profile.imageb || "") && (
+                                  <img className="account-avatar" src={item.profile.images || item.profile.imageb} alt="账号头像" referrerPolicy="no-referrer" loading="lazy" />
+                                )}
+                                <div>
+                                  <strong>{item.profile.nickname || "昵称未返回"}</strong>
+                                  <small>小红书号：{item.profile.red_id || "—"}</small>
+                                  <small>用户 ID：{item.profile.user_id || item.user_id || "—"}</small>
+                                  {item.profile.desc && <small className="account-description">{item.profile.desc}</small>}
+                                </div>
+                              </div>
+                            )}
                             <small>{formatDate(item.created_at)} 创建</small>
                           </td>
                           <td className="mono">

@@ -45,6 +45,8 @@ Task schema 拒绝额外字段。前端编辑只从 defaults 中选出可编辑�
 
 账号支持 `rednote`（默认）/ `xiaohongshu`。Cookie 必须至少有 `a1` 和 `web_session`。健康检查通过上游 bootstrap 获取 user_id；过期时提示手动更新 Cookie。
 
+bootstrap 复用 `/api/sns/web/v2/user/me` 响应，将公开资料缓存到 auth.user_profile（不额外请求）。检查通过将 user_id 与 profile 保存到账户记录；profile 包含 nickname、red_id、images/imageb、desc、gender、guest 和 user_id，不保存 xsec_token。列表展示昵称、头像、小红书号、用户 ID、简介；搜索支持昵称/小红书号。既有账号重新点击检查后补齐资料；检查失败保留上次成功资料并显示失败状态。
+
 `POST /api/accounts/{id}/sms` 单次查询 `http://www.9527sms.cc/api/sms/record?key=...`，读取加密保存的接码 Key，不需要有效 Cookie。前端每隔 5 秒查询，最多 60 次，关闭弹窗停止下一次轮询；单次已发请求可能完成。结果状态为 received / waiting / expired / invalid_key / forbidden / error；全文只在弹窗显示，不持久化。HTTP 请求失败返回 502。目前接码请求独立直连、timeout 10 秒，不继承采集代理。
 
 ### 搜索参数

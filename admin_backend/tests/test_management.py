@@ -266,6 +266,28 @@ def test_token_shape_is_checked_before_upstream_network():
         SpiderXHSAdapter(cookie="a1=present")._auth()
 
 
+def test_account_check_saves_profile_without_access_tokens(client, monkeypatch):
+    account = create(client, "accounts", {"name": "profile", "cookie": "fake"})
+
+    class ProfileAdapter:
+        def check(self):
+            return {"user_id": "user-1", "profile": {
+                "user_id": "user-1", "nickname": "小红薯", "red_id": "12345",
+                "images": "https://example.com/avatar.jpg", "desc": "简介",
+                "gender": 0, "guest": False, "xsec_token": "private-token",
+            }}
+
+    monkeypatch.setattr("app.api.management.adapter", lambda account: ProfileAdapter())
+    result = client.post(f"/api/accounts/{account['id']}/check").json()
+    assert result["status"] == "healthy"
+    assert result["profile"]["nickname"] == "小红薯"
+    assert result["profile"]["gender"] == 0
+    assert result["profile"]["guest"] is False
+    assert "xsec_token" not in result["profile"]
+    assert "private-token" not in str(storage.get("accounts", account["id"]))
+    assert client.get("/api/accounts").json()[0]["profile"] == result["profile"]
+
+
 def test_account_check_reports_actionable_error(client, monkeypatch):
     account = create(
         client, "accounts", {"name": "bad", "cookie": "a1=old; web_session=old"}

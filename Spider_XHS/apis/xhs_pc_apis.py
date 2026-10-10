@@ -96,6 +96,11 @@ class XHS_Apis():
         if not uid:
             raise RuntimeError('bootstrap: user/me 未返回 user_id')
         self.auth.set_user_id(uid)
+        self.auth.user_profile = {
+            key: res['data'][key]
+            for key in ('user_id', 'nickname', 'red_id', 'images', 'imageb', 'desc', 'gender', 'guest')
+            if key in res['data']
+        }
         return self
 
     def _proxies(self, proxies: dict = None):

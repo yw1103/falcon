@@ -79,6 +79,10 @@ def check_account(record_id):
         try:
             result = adapter(account).check()
             account.update(status="healthy", user_id=result["user_id"])
+            account["profile"] = {
+                key: value for key, value in result.get("profile", {}).items()
+                if key in {"user_id", "nickname", "red_id", "images", "imageb", "desc", "gender", "guest"}
+            }
             account.pop("last_error", None)
         except Exception as error:
             from ..services import account_error
