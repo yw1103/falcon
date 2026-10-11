@@ -81,7 +81,7 @@ def test_proxy_off_clears_choice_and_never_falls_back(client):
 
 
 @pytest.mark.parametrize("fetch_content", [False, True])
-def test_sample_keeps_raw_data_and_search_options(client, monkeypatch, fetch_content):
+def test_run_keeps_raw_data_and_search_options(client, monkeypatch, fetch_content):
     account = create(client, "accounts", {"name": "ca", "cookie": "fake-cookie"})
     task = create(
         client,
@@ -103,7 +103,7 @@ def test_sample_keeps_raw_data_and_search_options(client, monkeypatch, fetch_con
             assert kwargs["fetch_content"] is fetch_content
             assert keyword == "coffee"
             assert max_items == 20
-            assert single_page is True
+            assert single_page is False
             assert options["sort_type_choice"] == 2
             assert options["note_type"] == 1
             assert options["geo"] == {"latitude": 43.65, "longitude": -79.38}
@@ -118,7 +118,7 @@ def test_sample_keeps_raw_data_and_search_options(client, monkeypatch, fetch_con
             ]
 
     monkeypatch.setattr(services, "adapter", lambda *args: FakeAdapter())
-    response = client.post("/api/tasks/" + task["id"] + "/sample")
+    response = client.post("/api/tasks/" + task["id"] + "/run")
     assert response.status_code == 200
     run = response.json()
     assert run["notes"][0]["note_card"]["secret"] == "hidden"
@@ -135,6 +135,35 @@ def test_validation_does_not_echo_key(client):
     )
     assert response.status_code == 422
     assert "secret" not in response.text
+
+
+def test_homefeed_independent_validation_execution_and_channels(client, monkeypatch):
+    account = create(client, "accounts", {"name": "home"})
+    base = {"name": "recommend", "account_id": account["id"]}
+    assert client.post("/api/tasks", json=base).status_code == 422
+    task = create(client, "tasks", {**base, "collection_type": "homefeed", "pos_distance": 1})
+    assert task["keyword"] == ""
+    assert task["geo"] is None
+
+    class HomeAdapter:
+        def homefeed_notes(self, category, max_items, fetch_content):
+            assert category == "homefeed_recommend"
+            assert max_items == 20
+            return [{"id": "note", "extra": {"raw": True}}]
+
+        def homefeed_channels(self):
+            return {"data": {"categories": [{"id": "homefeed_recommend", "name": "推荐"}]}}
+
+    monkeypatch.setattr(services, "adapter", lambda *args: HomeAdapter())
+    monkeypatch.setattr("app.api.management.adapter", lambda *args: HomeAdapter())
+    run = client.post(f"/api/tasks/{task['id']}/run").json()
+    assert run["collection_type"] == "homefeed"
+    assert run["notes"][0]["extra"]["raw"] is True
+    assert "keyword" not in run["search"]
+    assert "note_type" not in run["search"]
+    assert run["search"]["category"] == "homefeed_recommend"
+    assert client.post("/api/homefeed/channels", json={"account_id": account["id"]}).status_code == 200
+    assert not any("/sample" in p for p in client.get("/openapi.json").json()["paths"])
 
 
 def test_delete_and_disabled_proxy_fail_closed(client):

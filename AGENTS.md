@@ -40,4 +40,4 @@ RedNote 上游改动另运行 `admin_backend/.venv/Scripts/python.exe -m pytest 
 
 不要默认认为服务已启动。先检查端口和实际进程；本地后端不使用 reload，代码变更后需重启才能生效。不要同时运行本地后端与读取同一数据目录的 Docker 后端。
 
-仓库现状：根目录及两个管理目录当前没有 Git 仓库，`Spider_XHS` 有独立 `.git`。已有上游修改不能被 reset/checkout 覆盖；此前 `.env.example` 的删除是已有工作区状态。
+仓库现状：项目根目录已有 Git 仓库；Spider_XHS 当前作为根仓库目录管理。修改前检查实际 git status，不覆盖已有工作区修改。

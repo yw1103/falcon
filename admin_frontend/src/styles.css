@@ -719,6 +719,8 @@ td small {
   display: flex;
   align-items: center;
   gap: 15px;
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 .list-toolbar select {
   font-size: 10px;

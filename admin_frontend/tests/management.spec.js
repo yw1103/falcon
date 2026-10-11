@@ -74,7 +74,7 @@ test("管理台 CRUD、代理开关、密钥编辑与页面布局", async ({ pag
   await page.getByRole("button", { name: "保存修改" }).click();
   await expect(page.getByRole("dialog")).toHaveCount(0);
   await expect(page.getByText("updated-model", { exact: true })).toBeVisible();
-  await page.getByRole("button", { name: /^采集任务/ }).click();
+  await page.getByRole("button", { name: /^搜索采集/ }).click();
   await page
     .getByRole("button", { name: "添加搜索任务", exact: true })
     .first()
@@ -99,8 +99,24 @@ test("管理台 CRUD、代理开关、密钥编辑与页面布局", async ({ pag
   expect(tasks[0].use_proxy).toBe(false);
   expect(tasks[0].proxy_id).toBeNull();
   await page.reload();
-  await page.getByRole("button", { name: /^采集任务/ }).click();
+  await page.getByRole("button", { name: /^搜索采集/ }).click();
   await expect(page.getByText("关键词采集", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "主页采集", exact: true }).click();
+  await expect(page.getByText("关键词采集", { exact: true })).toHaveCount(0);
+  await page.getByRole("button", { name: "添加主页任务", exact: true }).first().click();
+  await expect(page.getByLabel("搜索关键词", { exact: true })).toHaveCount(0);
+  await expect(page.getByLabel("排序方式", { exact: true })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "试采集", exact: true })).toHaveCount(0);
+  await page.getByLabel("名称", { exact: true }).fill("推荐采集");
+  await page.getByLabel("采集账号", { exact: true }).selectOption({ label: "测试账号" });
+  await page.getByRole("button", { name: "保存配置" }).click();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await expect(page.getByText("推荐采集", { exact: true })).toBeVisible();
+  const home = (await (await request.get("/api/tasks")).json()).find((t) => t.name === "推荐采集");
+  expect(home.collection_type).toBe("homefeed");
+  expect(home.keyword).toBe("");
+  await request.delete("/api/tasks/" + home.id);
+  await page.getByRole("button", { name: /^搜索采集/ }).click();
   await page.getByRole("button", { name: "删除关键词采集" }).click();
   await page.getByRole("button", { name: "确认删除" }).click();
   await expect(page.getByRole("dialog")).toHaveCount(0);

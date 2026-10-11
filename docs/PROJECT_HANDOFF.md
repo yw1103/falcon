@@ -1,6 +1,6 @@
 # 猎隼项目交接
 
-更新日期：2026-10-09。以实际代码和依赖清单为准；此文档不包含任何真实凭据。
+更新日期：2026-10-11。以实际代码和依赖清单为准；此文档不包含任何真实凭据。
 
 ## 技术栈
 
@@ -65,7 +65,16 @@ bootstrap 复用 `/api/sns/web/v2/user/me` 响应，将公开资料缓存到 aut
 | pos_distance | 0 | 0 不限、1 同城、2 附近 |
 | geo | null | 距离非零必填 latitude/longitude；纬度 ±90、经度 ±180 |
 
-试采集只搜索第一页，最多 `min(max_items,20)`，不投递 Dify；如果开启正文，试采集同样获取详情，耗时会增加。编辑表单当前要求先保存任务；表单试采集会先 PUT 当前配置。
+试采集功能已移除（前端入口和 POST /api/tasks/{id}/sample）。历史 sample 记录保留。
+
+### 主页采集
+
+搜索采集与主页采集有独立导航页面、表单及执行路径。Task 新增 collection_type（search/homefeed，旧任务默认 search）、category（默认 homefeed_recommend）。搜索任务关键词必填；主页任务不需要关键词，保存时清空搜索筛选。通用账号、代理、间隔/随机浮动、数量、正文、Dify 配置复用。
+
+POST /api/homefeed/channels 使用所选账号和任务代理配置获取完整频道响应，不继承账号代理。主页分页调用上游 get_homefeed_recommend：首批 cursor_score=""、refresh_type=1、note_index=0；后续使用响应游标、refresh_type=3、note_index 每批加 20；num/need_num 使用上游默认 20/10。每轮重新刷新，仅本轮按 ID 去重，空批次、无新增、重复/缺失游标或 has_more=false 停止，最多 max_items 页，不保证取得目标条数。原始 item 字段保留，正文使用 pc_feed（搜索仍 pc_search）。上游超时 15 秒，目前主页无自动重试。
+
+run 及 Dify 的 search 参数快照增加 collection_type；主页快照包含 category，不包含 keyword 和搜索筛选。保留 search 外层字段用于现有 Dify 契约兼容。真实 RedNote 推荐和频道响应尚需有效账号验证。
+
 
 正式采集按 max_items 翻页；搜索失败会导致本轮 failed。搜索 curl 28 超时最多重试一次，重试使用任务请求间隔（含随机浮动），不重试其他业务失败。上游搜索 timeout 为 45 秒。
 
@@ -75,7 +84,7 @@ bootstrap 复用 `/api/sns/web/v2/user/me` 响应，将公开资料缓存到 aut
 
 ### Dify 与运行记录
 
-run 保存 task_id、task_name、sample、status、count、search 参数快照、notes；失败保存 error。Dify 失败标记 delivery_failed，采集数据仍保留。列表目前最多返回最近 100 条，但数据库无自动清理策略。
+run 保存 task_id、task_name、collection_type、sample（新记录恒 false）、status、count、search 参数快照、notes；失败保存 error。Dify 失败标记 delivery_failed，采集数据仍保留。列表目前最多返回最近 100 条，但数据库无自动清理策略。
 
 投递内容固定为以下对象的 JSON 字符串，放在 `inputs[预设.input_variable]`，默认变量名 content。Chat 同时将这个字符串作为 query：
 

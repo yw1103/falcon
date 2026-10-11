@@ -61,9 +61,18 @@ def runs():
     return storage.all_records("runs")[:100]
 
 
-@router.post("/tasks/{record_id}/sample")
-def sample(record_id):
-    return safe_run(record_id, sample=True)
+@router.post("/homefeed/channels")
+def homefeed_channels(payload: dict):
+    account = required("accounts", payload.get("account_id"))
+    if not account["enabled"]:
+        raise HTTPException(400, "所选账号已停用")
+    with lock_for("account:" + account["id"]):
+        try:
+            return adapter(account, payload).homefeed_channels()
+        except HTTPException:
+            raise
+        except Exception as error:
+            raise HTTPException(502, explain_error(error))
 
 
 @router.post("/tasks/{record_id}/run")

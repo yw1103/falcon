@@ -76,28 +76,36 @@ def dify_send(preset, payload, proxy=None):
         return result
 
 
-def execute_task(task_id, sample=False):
+def execute_task(task_id):
     task = required("tasks", task_id)
     account = required("accounts", task["account_id"])
     if not account["enabled"]:
         raise HTTPException(400, "所选账号已停用")
     with lock_for("account:" + account["id"]):
-        notes = adapter(account, task).search_notes(
-            task["keyword"],
-            min(task["max_items"], 20) if sample else task["max_items"],
-            options={
-                "sort_type_choice": task.get("sort_type_choice", 0),
-                "note_type": task.get("note_type", 0),
-                "note_time": task.get("note_time", 0),
-                "note_range": task.get("note_range", 0),
-                "pos_distance": task.get("pos_distance", 0),
-                "geo": task.get("geo"),
-            },
-            single_page=sample,
-            fetch_content=task.get("fetch_content", False),
-        )
+        collector = adapter(account, task)
+        if task.get("collection_type", "search") == "homefeed":
+            notes = collector.homefeed_notes(
+                task.get("category", "homefeed_recommend"), task["max_items"],
+                fetch_content=task.get("fetch_content", False),
+            )
+        else:
+            notes = collector.search_notes(
+                task["keyword"],
+                task["max_items"],
+                options={
+                    "sort_type_choice": task.get("sort_type_choice", 0),
+                    "note_type": task.get("note_type", 0),
+                    "note_time": task.get("note_time", 0),
+                    "note_range": task.get("note_range", 0),
+                    "pos_distance": task.get("pos_distance", 0),
+                    "geo": task.get("geo"),
+                },
+                single_page=False,
+                fetch_content=task.get("fetch_content", False),
+            )
     search = {
-        "keyword": task["keyword"],
+        "keyword": task.get("keyword", ""),
+        "collection_type": task.get("collection_type", "search"),
         "query_num": task["max_items"],
         "fetch_content": task.get("fetch_content", False),
         "interval_seconds": task["interval_seconds"],
@@ -113,17 +121,22 @@ def execute_task(task_id, sample=False):
         "pos_distance": task.get("pos_distance", 0),
         "geo": task.get("geo"),
     }
+    if search["collection_type"] == "homefeed":
+        for key in ("keyword", "sort_type_choice", "note_type", "note_time", "note_range", "pos_distance", "geo"):
+            search.pop(key, None)
+        search["category"] = task.get("category", "homefeed_recommend")
     run = {
         "task_id": task_id,
         "task_name": task["name"],
+        "collection_type": task.get("collection_type", "search"),
         "status": "success",
-        "sample": sample,
+        "sample": False,
         "count": len(notes),
         "search": search,
         "notes": notes,
     }
     try:
-        if not sample and task.get("dify_preset_id") and notes:
+        if task.get("dify_preset_id") and notes:
             preset = required("dify", task["dify_preset_id"])
             if not preset["enabled"]:
                 raise HTTPException(400, "Dify 预设已停用")
@@ -142,12 +155,12 @@ def execute_task(task_id, sample=False):
     return saved
 
 
-def safe_run(task_id, sample=False):
+def safe_run(task_id):
     lock = lock_for("task:" + task_id)
     if not lock.acquire(blocking=False):
         raise HTTPException(409, "该任务正在执行")
     try:
-        return execute_task(task_id, sample)
+        return execute_task(task_id)
     except HTTPException:
         raise
     except Exception as error:
@@ -159,8 +172,9 @@ def safe_run(task_id, sample=False):
             {
                 "task_id": task_id,
                 "task_name": task["name"],
+                "collection_type": task.get("collection_type", "search"),
                 "status": "failed",
-                "sample": sample,
+                "sample": False,
                 "count": 0,
                 "error": diagnostic,
             },

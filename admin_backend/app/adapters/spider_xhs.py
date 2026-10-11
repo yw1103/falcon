@@ -125,7 +125,65 @@ class SpiderXHSAdapter:
         finally:
             auth.close()
 
-    def _fetch_contents(self, api, auth, notes):
+    def homefeed_channels(self):
+        auth = self._auth()
+        from apis.xhs_pc_apis import XHS_Apis
+
+        try:
+            ok, message, result = XHS_Apis(auth).get_homefeed_all_channel(proxies=self.proxy)
+            if not ok:
+                raise RuntimeError(f"Spider_XHS 频道接口返回失败：{message}")
+            return result
+        finally:
+            auth.close()
+
+    def homefeed_notes(self, category, max_items=20, fetch_content=False):
+        auth = self._auth()
+        from apis.xhs_pc_apis import XHS_Apis
+
+        try:
+            api = XHS_Apis(auth)
+            notes, seen, cursors = [], set(), set()
+            cursor, refresh_type, note_index = "", 1, 0
+            # Recommendation feeds may repeat posts indefinitely; bound each run.
+            for page in range(max_items):
+                if page:
+                    self._wait_request()
+                ok, message, result = api.get_homefeed_recommend(
+                    category, cursor, refresh_type, note_index, proxies=self.proxy,
+                )
+                if not ok:
+                    raise RuntimeError(f"Spider_XHS 主页推荐接口返回失败：{message}")
+                data = result.get("data") if isinstance(result, dict) else None
+                if not isinstance(data, dict) or not isinstance(data.get("items"), list):
+                    raise RuntimeError("主页推荐接口返回了非预期数据结构")
+                batch = data["items"]
+                added = 0
+                for note in batch:
+                    note_id = note.get("id") or note.get("note_id")
+                    if note_id and note_id in seen:
+                        continue
+                    if note_id:
+                        seen.add(note_id)
+                    notes.append(note)
+                    added += 1
+                    if len(notes) >= max_items:
+                        break
+                next_cursor = data.get("cursor_score")
+                if (len(notes) >= max_items or not batch or not added
+                        or data.get("has_more") is False or next_cursor in (None, "")
+                        or str(next_cursor) in cursors):
+                    break
+                cursors.add(str(next_cursor))
+                cursor, refresh_type = next_cursor, 3
+                note_index += 20
+            if fetch_content:
+                self._fetch_contents(api, auth, notes, source="pc_feed")
+            return notes
+        finally:
+            auth.close()
+
+    def _fetch_contents(self, api, auth, notes, source="pc_search"):
         from ..services import explain_error
 
         for note in notes:
@@ -135,11 +193,11 @@ class SpiderXHSAdapter:
             token = note.get("xsec_token")
             if not note_id or not token:
                 note["content_status"] = "failed"
-                note["content_error"] = "搜索结果缺少笔记 ID 或详情访问凭据"
+                note["content_error"] = "采集结果缺少笔记 ID 或详情访问凭据"
                 continue
             self._wait_request()
             url = auth.origin("web") + "/explore/" + str(note_id) + "?" + urlencode(
-                {"xsec_token": token, "xsec_source": "pc_search"}
+                {"xsec_token": token, "xsec_source": source}
             )
             try:
                 ok, message, result = api.get_note_info(url, proxies=self.proxy)

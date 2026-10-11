@@ -21,6 +21,7 @@ import {
   Loader2,
   MessageSquare,
   Network,
+  Pause,
   Play,
   Plus,
   RefreshCw,
@@ -45,10 +46,16 @@ const pages = {
     icon: LayoutDashboard,
   },
   tasks: {
-    title: "采集任务",
+    title: "搜索采集",
     subtitle: "配置搜索计划，将有价值的内容送往下一站。",
     icon: Workflow,
     singular: "搜索任务",
+  },
+  home_tasks: {
+    title: "主页采集",
+    subtitle: "按账号与频道采集主页推荐帖子。",
+    icon: Globe2,
+    singular: "主页任务",
   },
   accounts: {
     title: "账号池",
@@ -116,6 +123,8 @@ const defaults = {
   },
   tasks: {
     name: "",
+    collection_type: "search",
+    category: "homefeed_recommend",
     keyword: "",
     interval_seconds: 300,
     request_interval_seconds: 5,
@@ -229,7 +238,7 @@ function App() {
   const [tokenLoaded, setTokenLoaded] = useState(false);
   const [tokenExists, setTokenExists] = useState(false);
   const [busy, setBusy] = useState("");
-  const [sample, setSample] = useState(null);
+  const [channels, setChannels] = useState([]);
   const [inspect, setInspect] = useState(null);
   const [smsAccount, setSmsAccount] = useState(null);
   const [smsResult, setSmsResult] = useState(null);
@@ -293,6 +302,8 @@ function App() {
     setFilter("all");
   }
   function edit(kind, item = null) {
+    const home = kind === "home_tasks" || item?.collection_type === "homefeed";
+    if (kind === "home_tasks") kind = "tasks";
     setTokenLoaded(false);
     setTokenExists(kind === "accounts" && !!item?.has_cookie);
     setForm(
@@ -303,13 +314,14 @@ function App() {
               item[k] ?? defaults[kind][k],
             ]),
           )
-        : structuredClone(defaults[kind]),
+        : { ...structuredClone(defaults[kind]), ...(kind === "tasks" ? { collection_type: home ? "homefeed" : "search" } : {}) },
     );
-    setSample(null);
+    setChannels([]);
     setModal({ kind, id: item?.id });
     setError("");
   }
   function update(key, value) {
+    if (["account_id", "use_proxy", "proxy_id"].includes(key)) setChannels([]);
     setForm((prev) => ({ ...prev, [key]: value }));
   }
   async function perform(key, action, message = "操作完成") {
@@ -345,9 +357,9 @@ function App() {
     const result = await perform(
       item.id,
       () => api(`${kind}/${item.id}/${name}`, "POST"),
-      name === "sample" ? "试采集完成" : "操作完成",
+      "操作完成",
     );
-    if (name === "sample" && result) setInspect(result);
+
     if (kind === "accounts" && name === "check" && result?.last_error) {
       setError(`账号检查失败：${result.last_error}`);
     }
@@ -361,7 +373,7 @@ function App() {
   }
   async function toggleTask(item) {
     const payload = Object.fromEntries(
-      Object.keys(defaults.tasks).map((k) => [k, item[k]]),
+      Object.keys(defaults.tasks).map((k) => [k, item[k] ?? defaults.tasks[k]]),
     );
     payload.status = item.status === "running" ? "paused" : "running";
     await perform(
@@ -370,20 +382,18 @@ function App() {
       "任务状态已更新",
     );
   }
-  async function formSample() {
-    if (!modal.id) {
-      setError("请先保存任务，再进行试采集。");
-      return;
-    }
-    const result = await perform(
-      "sample",
-      async () => {
-        await api("tasks/" + modal.id, "PUT", form);
-        return api("tasks/" + modal.id + "/sample", "POST");
-      },
-      "试采集完成",
-    );
-    if (result) setSample(result);
+  async function loadChannels() {
+    if (!form.account_id) { setError("请先选择采集账号"); return; }
+    await perform("channels", async () => {
+      const result = await api("homefeed/channels", "POST", {
+        account_id: form.account_id, use_proxy: form.use_proxy, proxy_id: form.proxy_id,
+      });
+      const list = Array.isArray(result?.data) ? result.data : result?.data?.categories;
+      if (!Array.isArray(list)) throw new Error("频道接口返回了非预期数据结构");
+      const choices = list.map((c) => ({ id: c.id ?? c.category ?? c.channel_id, name: c.name ?? c.title ?? c.channel_name })).filter((c) => c.id && c.name);
+      if (!choices.length) throw new Error("频道接口未返回可选频道");
+      setChannels(choices);
+    }, "频道已加载");
   }
   const running = data.tasks.filter(
     (t) => t.status === "running" && t.enabled,
@@ -391,8 +401,9 @@ function App() {
   const totalNotes = data.runs
     .filter((r) => !r.sample)
     .reduce((sum, r) => sum + (r.count || 0), 0);
-  const rows = (data[page] || []).filter(
+  const rows = (data[page === "home_tasks" ? "tasks" : page] || []).filter(
     (item) =>
+      (!(page === "tasks" || page === "home_tasks") || (item.collection_type || "search") === (page === "home_tasks" ? "homefeed" : "search")) &&
       JSON.stringify([
         item.name,
         item.keyword,
@@ -491,7 +502,7 @@ function App() {
         </div>
         <p className="nav-label">工作空间</p>
         <nav>
-          {["overview", "tasks", "accounts", "proxies"].map((key) => {
+          {["overview", "tasks", "home_tasks", "accounts", "proxies"].map((key) => {
             const Icon = pages[key].icon;
             return (
               <button
@@ -575,7 +586,7 @@ function App() {
                 <RefreshCw size={15} />
                 刷新
               </Button>
-              {defaults[page] && (
+              {(defaults[page] || page === "home_tasks") && (
                 <Button onClick={() => edit(page)}>
                   <Plus size={16} />
                   添加{pages[page].singular}
@@ -620,7 +631,7 @@ function App() {
                     title: "已采集内容",
                     value: totalNotes,
                     icon: ArrowDownToLine,
-                    foot: "不含试采集数据",
+                    foot: "不含历史试采集数据",
                   },
                   {
                     title: "服务集成",
@@ -801,7 +812,7 @@ function App() {
                 </div>
                 <div>
                   <span className="muted">共 {rows.length} 条</span>
-                  {page === "tasks" && (
+                  {(page === "tasks" || page === "home_tasks") && (
                     <select
                       aria-label="任务状态筛选"
                       value={filter}
@@ -815,7 +826,7 @@ function App() {
                   )}
                 </div>
               </div>
-              {page === "tasks" ? (
+              {(page === "tasks" || page === "home_tasks") ? (
                 <TaskTable
                   rows={rows}
                   busy={busy}
@@ -979,7 +990,7 @@ function App() {
                   </span>
                   <h3>还没有{pages[page].title}</h3>
                   <p>{pages[page].subtitle}</p>
-                  {defaults[page] && (
+                  {(defaults[page] || page === "home_tasks") && (
                     <Button onClick={() => edit(page)}>
                       <Plus size={15} />
                       添加{pages[page].singular}
@@ -1027,11 +1038,11 @@ function App() {
         title={
           modal?.kind === "ai-test"
             ? "模型试用"
-            : `${modal?.id ? "编辑" : "添加"}${pages[modal?.kind]?.singular || ""}`
+            : `${modal?.id ? "编辑" : "添加"}${modal?.kind === "tasks" && form.collection_type === "homefeed" ? "主页任务" : pages[modal?.kind]?.singular || ""}`
         }
         description={
           modal?.kind === "tasks"
-            ? "保存为草稿，试采集确认后再启动任务。"
+            ? "保存配置后启动任务，采集结果可在运行记录查看。"
             : "配置保存在本机；账号 Token 默认隐藏，需要时可显式查看。"
         }
       >
@@ -1203,9 +1214,16 @@ function App() {
                 )}
                 {modal.kind === "tasks" && (
                   <>
-                    <Field label="搜索关键词">
+                    {form.collection_type === "search" && <Field label="搜索关键词">
                       {text("keyword", "例如：加拿大生活")}
-                    </Field>
+                    </Field>}
+                    {form.collection_type === "homefeed" && <Field label="主页频道" hint="默认推荐频道；选择账号后可加载该站点的频道。">
+                      <select value={form.category} onChange={(e) => update("category", e.target.value)}>
+                        {!channels.some((c) => c.id === form.category) && <option value={form.category}>{form.category === "homefeed_recommend" ? "推荐" : form.category}</option>}
+                        {channels.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                      </select>
+                      <Button type="button" variant="outline" disabled={!!busy} onClick={loadChannels}>{busy === "channels" ? "正在加载…" : "加载频道"}</Button>
+                    </Field>}
                     <Field label="采集账号">
                       {select(
                         "account_id",
@@ -1240,7 +1258,7 @@ function App() {
                     </Field>
                     <Field
                       label="翻页间隔（秒）"
-                      hint="控制搜索分页请求的频率。"
+                      hint="控制分页与正文请求的频率。"
                     >
                       <input
                         type="number"
@@ -1263,7 +1281,7 @@ function App() {
                           <div><strong>{setting.label}</strong><small>每次等待重新抽取，实际间隔不会低于设定值。</small></div>
                           <Switch label={setting.label} checked={!!form[setting.enabled]} onCheckedChange={(value) => update(setting.enabled, value)} />
                         </div>
-                        {form[setting.enabled] && <Field label={`${setting.label}上限（秒）`} hint={`实际等待 ${form[setting.base]}–${Number(form[setting.base]) + Number(form[setting.jitter])} 秒。翻页设置也用于正文和搜索重试请求。`}>
+                        {form[setting.enabled] && <Field label={`${setting.label}上限（秒）`} hint={`实际等待 ${form[setting.base]}–${Number(form[setting.base]) + Number(form[setting.jitter])} 秒。翻页设置也用于正文请求。`}>
                           <input type="number" min="1" max={setting.max} value={form[setting.jitter]} onChange={(e) => update(setting.jitter, Number(e.target.value))} />
                         </Field>}
                       </div>
@@ -1276,6 +1294,7 @@ function App() {
                       )}
                     </Field>
                     {proxyFields}
+                    {form.collection_type === "search" && <>
                     <Field label="排序方式">
                       <select value={form.sort_type_choice} onChange={(e) => update("sort_type_choice", Number(e.target.value))}>
                         <option value={0}>综合排序</option><option value={1}>最新</option><option value={2}>最多点赞</option><option value={3}>最多评论</option><option value={4}>最多收藏</option>
@@ -1313,6 +1332,7 @@ function App() {
                         <input type="number" step="any" value={form.geo?.longitude ?? ""} onChange={(e) => update("geo", { ...form.geo, longitude: e.target.value === "" ? "" : Number(e.target.value) })} />
                       </Field>
                     </>}
+                    </>}
                     <div className="switch-row wide">
                       <div>
                         <strong>获取帖子正文</strong>
@@ -1329,27 +1349,7 @@ function App() {
                           <strong>原始采集数据</strong>
                           <small>完整保留 Spider_XHS 返回字段，后续由 Dify 工作流决定如何使用。</small>
                         </div>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          disabled={!!busy}
-                          onClick={formSample}
-                        >
-                          {busy === "sample" ? (
-                            <Loader2 className="spin" size={14} />
-                          ) : (
-                            <Play size={14} />
-                          )}
-                          试采集
-                        </Button>
                       </div>
-                      {sample && (
-                        <Field label={`试采集原始数据 · ${sample.count} 条`}>
-                          <pre className="preview">
-                            {JSON.stringify(sample.notes || [], null, 2)}
-                          </pre>
-                        </Field>
-                      )}
                     </div>
                   </>
                 )}
@@ -1443,7 +1443,7 @@ function TaskTable({ rows, busy, data, edit, action, toggle, remove }) {
       <table>
         <thead>
           <tr>
-            <th>任务 / 关键词</th>
+            <th>任务 / 采集来源</th>
             <th>执行频率</th>
             <th>代理</th>
             <th>状态</th>
@@ -1457,7 +1457,7 @@ function TaskTable({ rows, busy, data, edit, action, toggle, remove }) {
                 <strong>{item.name}</strong>
                 <small>
                   <Search size={11} />
-                  {item.keyword}
+                  {item.collection_type === "homefeed" ? `主页 · ${item.category === "homefeed_recommend" ? "推荐" : item.category}` : item.keyword}
                 </small>
               </td>
               <td>
@@ -1486,17 +1486,12 @@ function TaskTable({ rows, busy, data, edit, action, toggle, remove }) {
                   >
                     {busy === item.id ? (
                       <Loader2 className="spin" size={14} />
+                    ) : item.status === "running" ? (
+                      <Pause size={14} />
                     ) : (
                       <Play size={14} />
                     )}
                     <span>{item.status === "running" ? "暂停" : "启动"}</span>
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    disabled={!!busy}
-                    onClick={() => action("tasks", item, "sample")}
-                  >
-                    试采集
                   </Button>
                   <button
                     className="icon-button"
@@ -1547,7 +1542,7 @@ function RunTable({ rows, inspect }) {
               <td>
                 <strong>{r.task_name}</strong>
               </td>
-              <td>{r.sample ? "试采集" : "正式采集"}</td>
+              <td>{r.sample ? "历史试采集" : (r.collection_type || r.search?.collection_type) === "homefeed" ? "主页采集" : "搜索采集"}</td>
               <td>{r.count || 0} 条</td>
               <td>
                 <Status value={r.status} />

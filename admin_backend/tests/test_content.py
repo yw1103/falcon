@@ -3,6 +3,43 @@ from urllib.parse import parse_qs, urlsplit
 from app.adapters.spider_xhs import SpiderXHSAdapter
 
 
+def test_homefeed_pagination_dedup_and_detail_source(monkeypatch):
+    from app.adapters.spider_xhs import load_upstream
+
+    load_upstream()
+    calls, waits, details = [], [], []
+
+    class Auth:
+        closed = False
+
+        def close(self):
+            self.closed = True
+
+    auth = Auth()
+
+    class Api:
+        def __init__(self, value):
+            assert value is auth
+
+        def get_homefeed_recommend(self, category, cursor, refresh, index, proxies):
+            calls.append((category, cursor, refresh, index))
+            items = [{"id": "a", "raw": 1}, {"id": "b"}] if not cursor else [{"id": "b"}, {"id": "c"}]
+            return True, "ok", {"data": {"items": items, "cursor_score": "cursor"}}
+
+    monkeypatch.setattr("apis.xhs_pc_apis.XHS_Apis", Api)
+    adapter = SpiderXHSAdapter(cookie="unused")
+    monkeypatch.setattr(adapter, "_auth", lambda: auth)
+    monkeypatch.setattr(adapter, "_wait_request", lambda: waits.append(True))
+    monkeypatch.setattr(adapter, "_fetch_contents", lambda api, auth, notes, source: details.append(source))
+    notes = adapter.homefeed_notes("channel", 10, fetch_content=True)
+    assert [n["id"] for n in notes] == ["a", "b", "c"]
+    assert notes[0]["raw"] == 1
+    assert calls == [("channel", "", 1, 0), ("channel", "cursor", 3, 20)]
+    assert waits == [True]
+    assert details == ["pc_feed"]
+    assert auth.closed
+
+
 def test_details_preserve_search_data_and_continue_after_failure(monkeypatch):
     waits = []
     monkeypatch.setattr("app.adapters.spider_xhs.time.sleep", waits.append)

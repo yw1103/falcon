@@ -78,7 +78,9 @@ class Geo(BaseModel):
 
 
 class Task(Named):
-    keyword: str = Field(min_length=1, max_length=200)
+    collection_type: Literal["search", "homefeed"] = "search"
+    keyword: str = Field(default="", max_length=200)
+    category: str = Field(default="homefeed_recommend", min_length=1, max_length=200)
     interval_seconds: int = Field(default=300, ge=10)
     request_interval_seconds: int = Field(default=5, ge=1)
     randomize_task_interval: bool = True
@@ -106,6 +108,12 @@ class Task(Named):
             raise ValueError("开启代理后必须选择代理")
         if not self.use_proxy:
             self.proxy_id = None
+        if self.collection_type == "search" and not self.keyword.strip():
+            raise ValueError("搜索采集必须填写关键词")
+        if self.collection_type == "homefeed":
+            self.keyword = ""
+            self.sort_type_choice = self.note_type = self.note_time = self.note_range = self.pos_distance = 0
+            self.geo = None
         if self.pos_distance and self.geo is None:
             raise ValueError("选择同城或附近筛选时必须填写经纬度")
         return self
